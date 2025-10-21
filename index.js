@@ -3,7 +3,7 @@ const axios = require('axios'); // For making the external API call
 
 // ⚙️ CONFIGURATION
 // Ensure this BOT_TOKEN environment variable is set correctly on Vercel.
-const BOT_TOKEN = process.env.BOT_TOKEN || '8389699701:AAHneKVv07bhQAHHHLmtT8veAXzEu70Ckag';
+const BOT_TOKEN = process.env.BOT_TOKEN || '7833411390:AAESdKlN3Ra0Yz3gKKrdQ5_Gmr2G5fACHPQ';
 
 // Group chat ID where the bot must work. (Aapne UID -1003089918721 diya tha, usko hardcode rehne dete hain.)
 const TARGET_GROUP_ID = -1003089918721; 
