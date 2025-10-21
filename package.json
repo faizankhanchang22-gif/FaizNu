@@ -1,0 +1,13 @@
+{
+  "name": "telegram-vercel-bot",
+  "version": "1.0.0",
+  "description": "A Telegram bot designed for Vercel deployment.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.1",
+    "axios": "^1.6.8"  // <--- YEH NAYA ADD KIYA GAYA HAI
+  }
+}
