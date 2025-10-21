@@ -1,45 +1,46 @@
 const { Telegraf } = require('telegraf');
-const axios = require('axios'); // 'axios' is needed for making HTTP requests (API calls)
-
-// ⚠️ IMPORTANT: Aapko 'axios' ko 'package.json' mein add karna hoga (Neeche diya gaya hai).
+const axios = require('axios'); // For making the external API call
 
 // ⚙️ CONFIGURATION
+// Ensure this BOT_TOKEN environment variable is set correctly on Vercel.
 const BOT_TOKEN = process.env.BOT_TOKEN || '8389699701:AAHneKVv07bhQAHHHLmtT8veAXzEu70Ckag';
 
 // Group chat UID where the bot is allowed to work.
-const TARGET_GROUP_ID = -1003089918721;
+const TARGET_GROUP_ID = -1003089918721; 
 
-// List of mandatory channel UIDs
+// List of mandatory channel UIDs and usernames for display.
 const REQUIRED_CHANNELS = [
-    { id: -1003089918721, username: '@freefirelkies' },
-    { id: -1002018904140, username: '@owner_of_this_all' }
+    { id: -1003089918721, username: '@freefirelkies' }, 
+    { id: -1002018904140, username: '@owner_of_this_all' } 
 ];
 
 const bot = new Telegraf(BOT_TOKEN);
 
 /**
  * Checks if a user is a member of all required channels.
+ * Note: Bot must be an administrator in all channels for this to work.
  */
 async function isUserMemberOfAllChannels(userId) {
     for (const channel of REQUIRED_CHANNELS) {
         try {
             const member = await bot.telegram.getChatMember(channel.id, userId);
+            // Acceptable statuses: 'member', 'creator', 'administrator'.
             if (!['member', 'creator', 'administrator'].includes(member.status)) {
                 return false;
             }
         } catch (error) {
             console.error(`Error checking channel membership for ${channel.username}:`, error.message);
+            // If the bot cannot access the channel, we assume failure for security.
             return false;
         }
     }
-    return true;
+    return true; 
 }
 
 /**
  * Function to call the external API with the user's UID.
  */
 async function callExternalApi(userId) {
-    // Base URL ko alag rakha gaya hai taaki parameters easily add ho sakein.
     const BASE_URL = 'http://69.62.118.156:19126/like';
     const params = {
         uid: userId, // User's Telegram ID will be used as the 'uid'
@@ -50,24 +51,27 @@ async function callExternalApi(userId) {
     try {
         const response = await axios.get(BASE_URL, { params });
         console.log(`API Call Successful for UID ${userId}. Response:`, response.data);
-        return response.data; // Return the response data from the API
+        return response.data; 
     } catch (error) {
         console.error(`Error calling external API for UID ${userId}:`, error.message);
-        return null;
+        return { status: false, msg: 'External API server error.' }; // Return custom error object
     }
 }
 
 /**
- * Middleware to check if the message is from the target group.
+ * Middleware: Check if the message is from the target group.
  */
 bot.use(async (ctx, next) => {
+    // Check if the chat ID is the target group ID.
     if (ctx.chat && ctx.chat.id === TARGET_GROUP_ID) {
-        return next();
+        return next(); // Proceed to command handlers
     } else if (ctx.chat && ctx.chat.id !== TARGET_GROUP_ID) {
+        // Reply only if a command is sent outside the group.
         if (ctx.message && ctx.message.text && ctx.message.text.startsWith('/')) {
             await ctx.reply(`❌ **Yeh Bot Sirf Group Chat Main Work Karega.**`);
         }
     }
+    // Ignore all other messages and private chats.
 });
 
 
@@ -86,16 +90,12 @@ bot.command('start', async (ctx) => {
         const apiResponse = await callExternalApi(userId);
 
         if (apiResponse && apiResponse.status === true) {
-            // API response check (assuming the API returns JSON with status: true)
             const successMessage = `**🎉 Success!**\n\n**Aapka Kaam Ho Gaya.**\n\nAPI Status: ${apiResponse.msg || 'Done'}`;
             await ctx.replyWithMarkdown(successMessage);
-        } else if (apiResponse && apiResponse.msg) {
-             // Handle specific message from the external API (e.g., already done)
-             await ctx.replyWithMarkdown(`**⚠️ API Message:** ${apiResponse.msg}`);
-        }
-        else {
-            // API call failed or returned an unexpected response
-            await ctx.replyWithMarkdown(`**❌ Error:** External API Call Mein Koi Masla Hua. Please Check Server Logs.`);
+        } else {
+            // API call failed or returned status: false
+            const failureMessage = `**❌ Error:** External API Call Mein Masla Hua.\n\nAPI Response: ${apiResponse.msg || 'No response received.'}`;
+            await ctx.replyWithMarkdown(failureMessage);
         }
 
     } else {
@@ -114,13 +114,27 @@ bot.command('start', async (ctx) => {
     }
 });
 
-// Vercel Export Setup
+
+// 🚀 Vercel Export Setup (The fix for the "update_id" error is here)
 module.exports = async (req, res) => {
-    try {
-        await bot.handleUpdate(req.body, res);
-    } catch (error) {
-        console.error('Error handling update:', error.message);
-        res.statusCode = 500;
-        res.end();
+    // Check if the request is a POST request (from Telegram webhook)
+    if (req.method === 'POST' && req.body) {
+        try {
+            await bot.handleUpdate(req.body, res);
+        } catch (error) {
+            // Log the error but send a 200 OK so Telegram doesn't keep retrying.
+            console.error('Error handling Telegram update:', error.message);
+            res.statusCode = 200; 
+            res.end();
+        }
+    } else {
+        // Handle GET requests (browser visits, Vercel monitors) gracefully.
+        res.statusCode = 200;
+        res.end('Bot is running and waiting for Telegram updates.');
     }
 };
+
+// Set commands for Telegram interface
+bot.telegram.setMyCommands([
+    { command: 'start', description: 'Bot ko start karein aur channels ki membership check karein.' }
+]);
